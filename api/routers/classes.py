@@ -69,27 +69,41 @@ async def add_class(
         # Create structured JSON data
         class_data = {
             "class_name": class_name,
-            "uploaded_at": datetime.now().isoformat(),
+            "uploaded_at": datetime.datetime.now().isoformat(),
             "total_students": len(students_data),
             "students": students_data
         }
         
-        # Save to JSON file (sanitize class_name for filename)
+        # Sanitize class_name for filename
         safe_class_name = "".join(c for c in class_name if c.isalnum() or c in (' ', '-', '_')).strip()
         safe_class_name = safe_class_name.replace(' ', '_')
-        json_filename = f"{safe_class_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        
+        # Check if class already exists and delete old files
+        existing_files = list(DATA_DIR.glob(f"{safe_class_name}_*.json"))
+        is_replacement = len(existing_files) > 0
+        
+        if existing_files:
+            # Delete all existing files for this class
+            for old_file in existing_files:
+                old_file.unlink()
+        
+        # Create new file with current timestamp
+        json_filename = f"{safe_class_name}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         json_filepath = DATA_DIR / json_filename
         
         with open(json_filepath, 'w', encoding='utf-8') as f:
             json.dump(class_data, f, indent=2, ensure_ascii=False)
         
+        message = f"Class '{class_name}' {'replaced' if is_replacement else 'added'} successfully"
+        
         return JSONResponse(
             status_code=200,
             content={
-                "message": f"Class '{class_name}' added successfully",
+                "message": message,
                 "class_name": class_name,
                 "total_students": len(students_data),
                 "file_saved": str(json_filepath),
+                "replaced": is_replacement,
                 "data": class_data
             }
         )
